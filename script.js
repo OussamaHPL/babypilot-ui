@@ -87,30 +87,26 @@ if(btnLock) {
     btnLock.addEventListener('click', () => {
         isLocked = !isLocked; 
         if (isLocked) {
-            // VERROUILLÉ
             btnLock.classList.add('locked');
             if(lockBtnText) lockBtnText.innerText = "UNLOCK WHEELS";
             if(lockStatus) {
                 lockStatus.innerText = "The Wheels Are Locked";
                 lockStatus.style.color = "#FF4757";
             }
-            // Remplace l'image par la version verrouillée
             if (strollerImage) {
-                strollerImage.src = "locked-poussette.png"; // Ou .png selon comment tu as enregistré l'image
-                strollerImage.style.filter = "drop-shadow(0 10px 15px rgba(255, 71, 87, 0.3))"; // Optionnel : garde une petite ombre rouge
+                strollerImage.src = "locked-poussette.png"; 
+                strollerImage.style.filter = "drop-shadow(0 10px 15px rgba(255, 71, 87, 0.3))";
             }
         } else {
-            // DÉVERROUILLÉ
             btnLock.classList.remove('locked');
             if(lockBtnText) lockBtnText.innerText = "LOCK WHEELS";
             if(lockStatus) {
                 lockStatus.innerText = "The Wheels are unlocked";
                 lockStatus.style.color = "#7AC4D8";
             }
-            // Remet l'image de base
             if (strollerImage) {
                 strollerImage.src = "poussette.png";
-                strollerImage.style.filter = "drop-shadow(0 10px 15px rgba(0,0,0,0.1))"; // Remet l'ombre normale
+                strollerImage.style.filter = "drop-shadow(0 10px 15px rgba(0,0,0,0.1))";
             }
         }
     });
@@ -144,34 +140,6 @@ if (btnWeather) {
                 }
                 weatherDisplay.classList.remove('hidden');
             }, 2500);
-        }
-    });
-}
-
-// --- ALARME ---
-const btnAlarm = document.getElementById('btn-alarm');
-const alarmBtnText = document.getElementById('alarm-btn-text');
-const soundBarContainer = document.getElementById('sound-bar-container');
-const soundBarFill = document.getElementById('sound-bar-fill');
-const alarmAudio = document.getElementById('alarm-sound');
-let isAlarmOn = false;
-
-if (btnAlarm && alarmAudio) {
-    btnAlarm.addEventListener('click', () => {
-        isAlarmOn = !isAlarmOn;
-        if (isAlarmOn) {
-            btnAlarm.classList.add('alarm-active');
-            if(alarmBtnText) alarmBtnText.innerText = "ARRÊTER L'ALARME";
-            soundBarContainer.classList.remove('hidden');
-            alarmAudio.play().catch(e => console.log("Interaction requise"));
-            soundBarFill.style.width = "100%";
-        } else {
-            btnAlarm.classList.remove('alarm-active');
-            if(alarmBtnText) alarmBtnText.innerText = "ACTIVER L'ALARME";
-            soundBarContainer.classList.add('hidden');
-            alarmAudio.pause();
-            alarmAudio.currentTime = 0;
-            soundBarFill.style.width = "0%";
         }
     });
 }
@@ -210,3 +178,88 @@ if(btnGps) {
         }
     });
 }
+
+// --- JOYSTICK ANALOGIQUE (ESP32) ---
+const joystickZone = document.getElementById('joystick-zone');
+const joystickKnob = document.getElementById('joystick-knob');
+const joystickStatus = document.getElementById('joystick-status');
+
+let isDragging = false;
+let centerX, centerY;
+const maxDistance = 45; // Ch7al y9der yt7erk l'axe
+
+function initJoystick() {
+    const rect = joystickZone.getBoundingClientRect();
+    centerX = rect.left + rect.width / 2;
+    centerY = rect.top + rect.height / 2;
+}
+
+function handleStart(e) {
+    if(e.cancelable) e.preventDefault(); // Bach maydizch scrolling f telephone
+    isDragging = true;
+    joystickKnob.classList.add('active');
+    joystickKnob.style.transition = 'none'; // N7ydo transition bach ytba3 sbe3 direct
+    initJoystick(); 
+    handleMove(e);
+}
+
+function handleMove(e) {
+    if (!isDragging) return;
+    if(e.cancelable) e.preventDefault();
+
+    let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    let deltaX = clientX - centerX;
+    let deltaY = clientY - centerY;
+    let distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    let angle = Math.atan2(deltaY, deltaX);
+
+    // N7bsoh f l7ed dyal cercle
+    if (distance > maxDistance) {
+        deltaX = Math.cos(angle) * maxDistance;
+        deltaY = Math.sin(angle) * maxDistance;
+    }
+
+    joystickKnob.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+
+    // Calcul dyal la direction
+    let direction = "STOP";
+    if (distance > 15) { // Deadzone (khass yfot chwiya lwest bach yt7seb mouvement)
+        let deg = angle * (180 / Math.PI);
+        if (deg > -45 && deg <= 45) direction = "DROITE";
+        else if (deg > 45 && deg <= 135) direction = "ARRIÈRE";
+        else if (deg > 135 || deg <= -135) direction = "GAUCHE";
+        else if (deg > -135 && deg <= -45) direction = "AVANT";
+    }
+
+    if(joystickStatus) {
+        joystickStatus.innerText = `COMMANDE: ${direction}`;
+        if(direction === "STOP") {
+            joystickStatus.style.color = "#F4A261";
+        } else {
+            joystickStatus.style.color = "#2ED573";
+        }
+    }
+}
+
+function handleEnd() {
+    isDragging = false;
+    joystickKnob.classList.remove('active');
+    joystickKnob.style.transition = 'transform 0.2s ease-out';
+    joystickKnob.style.transform = `translate(0px, 0px)`; // Yrje3 lwest
+    if(joystickStatus) {
+        joystickStatus.innerText = "COMMANDE: STOP";
+        joystickStatus.style.color = "#F4A261";
+    }
+}
+
+// Les events dyal la Souris (PC)
+joystickKnob.addEventListener('mousedown', handleStart);
+document.addEventListener('mousemove', handleMove);
+document.addEventListener('mouseup', handleEnd);
+
+// Les events dyal Tactile (Téléphone)
+joystickKnob.addEventListener('touchstart', handleStart, {passive: false});
+document.addEventListener('touchmove', handleMove, {passive: false});
+document.addEventListener('touchend', handleEnd);
